@@ -1,0 +1,10 @@
+# Security & credentials
+.env
+*.env
+token*.json
+login-pending*.json
+
+# Build artifacts
+app.js
+dist/
+node_modules/

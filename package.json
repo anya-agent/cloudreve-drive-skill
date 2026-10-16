@@ -1,0 +1,14 @@
+{
+  "name": "cloudreve-drive",
+  "version": "1.0.0",
+  "description": "Cloudreve v4 REST API client & skill for Hermes Agent (OAuth2 PKCE flow)",
+  "type": "module",
+  "scripts": {
+    "build": "bun build source/index.ts --outfile app.js --target node"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "bun-types": "latest",
+    "typescript": "^5"
+  }
+}

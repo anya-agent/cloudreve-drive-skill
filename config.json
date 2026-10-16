@@ -1,0 +1,9 @@
+{
+  "baseUrl": { "type": "env", "id": "CLOUDREVE_BASE_URL" },
+  "clientId": { "type": "env", "id": "CLOUDREVE_CLIENT_ID" },
+  "clientSecret": { "type": "env", "id": "CLOUDREVE_CLIENT_SECRET" },
+  "scopes": "openid email profile offline_access UserSecurityInfo.Write UserInfo.Write Files.Write Shares.Write Finance.Write Workflow.Write DavAccount.Write",
+  "redirectUriCandidates": ["http://localhost:6689", "http://127.0.0.1", "http://localhost"],
+  "tokenFile": "token.json",
+  "chunkSizeFallback": 10485760
+}
