@@ -1,6 +1,6 @@
 ---
 name: cloudreve-drive
-description: "Manage files on AnyaDrive (Cloudreve v4) via OAuth-authenticated CLI."
+description: "Manage files on a Cloudreve v4 drive via OAuth-authenticated CLI."
 ---
 
 # cloudreve-drive
@@ -11,16 +11,16 @@ branch source (endpoints verified in `routers/router.go` + `service/explorer`).
 
 ## When to use
 
-- Upload/download/list/delete/move/rename files on AnyaDrive from the terminal.
-- Check AnyaDrive account/storage status.
-- Any task where Korin says "放到网盘/AnyaDrive/云盘" or asks to fetch a file from it.
+- Upload/download/list/delete/move/rename files on the drive from the terminal.
+- Check account/storage status.
+- Any task where the user asks to upload, download or manage files on the drive.
 
 ## Invocation
 
 All commands run from the skill directory with bun:
 
 ```bash
-cd /opt/data/workspace/anya/skills/cloudreve-drive
+cd <path-to-this-skill>
 bun app.js <command> [args]
 ```
 
@@ -28,16 +28,16 @@ bun app.js <command> [args]
 `bun build source/index.ts --outfile app.js --target bun` after edits — `--target node`
 mangles Chinese output, same lesson as kawaii-health).
 
-### Auth commands (supports `--account <name>`, default is `anya` -> `token.json`, `--account korin` -> `token.korin.json`)
+### Auth commands (supports `--account <name>`, default is `default` -> `token.json`, `--account work` -> `token.work.json`)
 
 | Command | Effect |
 | :--- | :--- |
-| `login [--account <name>]` | Prints the OAuth authorize URL (PKCE S256). Open it in a browser logged into AnyaDrive and approve. |
+| `login [--account <name>]` | Prints the OAuth authorize URL (PKCE S256). Open it in a browser logged into the drive and approve. |
 | `login-finish [--account <name>] --code "<code or full callback URL>"` | Exchanges the authorization code for access+refresh tokens, saves to `token.<name>.json`. |
 | `status [--account <name>]` | Token validity, user info, storage used/quota. |
 | `logout [--account <name>]` | Clears token file for the selected account. |
 
-Login is a two-step human-consent flow by design: `login` → Korin approves in browser →
+Login is a two-step human-consent flow by design: `login` → the user approves in browser →
 browser lands on a failing `http://127.0.0.1/?code=...&state=...` page → copy the URL →
 `login-finish --code "<that URL>"`. The access token auto-refreshes via
 `POST /api/v4/session/token/refresh` when expired (needs `offline_access` scope, which is
@@ -92,14 +92,14 @@ Output: JSON or plain text on stdout; errors on stderr with non-zero exit.
 ## Safety
 
 - `rm` defaults to soft delete (recoverable from trash); `--hard` is destructive — confirm
-  with Korin before using it or deleting anything important.
+  with the user before using it or deleting anything important.
 - Never print `token.json` contents or the client secret into chat/logs.
 - The `.env` and `token.json` are gitignored; do not commit them.
 
 ## Known pitfalls
 
 - If the authorize page shows "Invalid redirect URI", the redirect URIs registered on the
-  app (created by Korin in the admin panel) don't include the one used. Override with
+  app (created by the user in the admin panel) don't include the one used. Override with
   `--redirect-uri <exact registered uri>` on both `login` and (optionally) `login-finish`.
 - Authorization codes are single-use and expire after 10 minutes; re-run `login` if the
   exchange fails with "Invalid or expired authorization code".

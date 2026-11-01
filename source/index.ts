@@ -80,7 +80,7 @@ async function cmdLogin(): Promise<void> {
   );
 
   const acctFlag = args.account ? ` --account ${args.account}` : "";
-  console.log("Open this URL in a browser where you are logged into AnyaDrive and approve:");
+  console.log("Open this URL in a browser where you are logged into the drive and approve:");
   console.log();
   console.log(url);
   console.log();
@@ -268,7 +268,7 @@ async function cmdMe(): Promise<void> {
 const HELP = `cloudreve-drive — Cloudreve v4 file manager
 
 Global option:
-  --account <name>      switch account profile (default: anya -> token.json; e.g. --account korin -> token.korin.json)
+  --account <name>      switch account profile (default: default -> token.json; e.g. --account work -> token.work.json)
 
 Auth:
   login                 print OAuth authorize URL (open in browser, approve)

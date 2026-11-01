@@ -1,6 +1,6 @@
 // Cloudreve v4 REST client: OAuth PKCE authorization-code flow + file operations.
 // All endpoints verified against cloudreve/Cloudreve master branch source (2026-10).
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { SKILL_ROOT, loadConfig, type AppConfig } from "./config.ts";
 
@@ -126,6 +126,32 @@ function accessExpired(t: TokenPair, skewSec = 60): boolean {
 
 // ---------- core HTTP ----------
 
+/** 请求超时：API 30s / 分片上传 300s / 下载 300s（避免 CDN 卡死把整条命令挂住） */
+const TIMEOUT_API_MS = 30_000;
+const TIMEOUT_TRANSFER_MS = 300_000;
+
+/**
+ * 传输类 fetch 带重试：CDN 边缘偶发证书链/握手失败（同一 URL 下一次就成功），
+ * 单次失败不该让整条上传/下载挂掉。
+ */
+async function fetchWithRetry(url: string, init: RequestInit = {}, attempts = 5): Promise<Response> {
+  let lastErr: unknown;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fetch(url, init);
+    } catch (e) {
+      lastErr = e;
+      const msg = String(e);
+      // 只对网络/证书类错误重试；业务 4xx 由调用方处理
+      if (i < attempts) {
+        await new Promise((r) => setTimeout(r, 400 * i + Math.floor(Math.random() * 300)));
+      }
+      if (msg.includes("certificate")) continue;
+    }
+  }
+  throw lastErr;
+}
+
 export class CrClient {
   cfg: AppConfig;
   token: TokenPair | null;
@@ -155,6 +181,7 @@ export class CrClient {
           : opts.form !== undefined
             ? opts.form.toString()
             : opts.rawBody,
+      signal: AbortSignal.timeout(TIMEOUT_API_MS),
     });
   }
 
@@ -294,6 +321,7 @@ export class CrClient {
         code_challenge: challenge,
         code_challenge_method: "S256",
       }),
+      signal: AbortSignal.timeout(TIMEOUT_API_MS),
     });
     const data = await res.json();
     if (data.code !== 0 || !data.data?.code) {
@@ -429,10 +457,11 @@ export class CrClient {
       const start = i * chunkSize;
       const end = Math.min(file.size, start + chunkSize);
       const blob = file.slice(start, end);
-      const res = await fetch(urls[i], {
+      const res = await fetchWithRetry(urls[i], {
         method: "PUT",
         headers: { "Content-Type": "application/octet-stream" },
         body: await blob.arrayBuffer(),
+        signal: AbortSignal.timeout(TIMEOUT_TRANSFER_MS),
       });
       if (!res.ok) {
         const t = await res.text().catch(() => "");
@@ -453,6 +482,7 @@ export class CrClient {
       method: "POST",
       headers: { "Content-Type": "application/octet-stream" },
       body: xml,
+      signal: AbortSignal.timeout(TIMEOUT_TRANSFER_MS),
     });
     if (!cres.ok) {
       const t = await cres.text().catch(() => "");
@@ -472,11 +502,20 @@ export class CrClient {
   async download(remoteUri: string, localPath: string): Promise<number> {
     const urls = await this.url([remoteUri], true);
     if (!urls.length || !urls[0].url) throw new Error(`no download url for ${remoteUri}`);
-    const res = await fetch(urls[0].url);
+    const res = await fetchWithRetry(urls[0].url, {
+      signal: AbortSignal.timeout(TIMEOUT_TRANSFER_MS),
+    });
     if (!res.ok) throw new Error(`download failed (HTTP ${res.status})`);
-    const buf = new Uint8Array(await res.arrayBuffer());
-    writeFileSync(localPath, buf);
-    return buf.length;
+    // 流式写盘：大文件不再整包读进内存
+    const sink = Bun.file(localPath).writer();
+    const reader = res.body!.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) sink.write(value);
+    }
+    await sink.end();
+    return statSync(localPath).size;
   }
 
   async me(): Promise<Record<string, any>> {
